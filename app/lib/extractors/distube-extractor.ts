@@ -14,7 +14,7 @@ export class DistubeExtractor extends BaseExtractor {
   isValidUrl(url: string): boolean {
     try {
       return ytdl.validateURL(url);
-    } catch (error) {
+    } catch {
       return false;
     }
   }
@@ -78,8 +78,8 @@ export class DistubeExtractor extends BaseExtractor {
         
         const downloadOptions = [
           {
-            quality: 'lowestaudio',
-            filter: 'audioonly',
+            quality: 'lowestaudio' as const,
+            filter: 'audioonly' as const,
             highWaterMark: 1 << 25,
             requestOptions: {
               headers: {
@@ -88,8 +88,8 @@ export class DistubeExtractor extends BaseExtractor {
             }
           },
           {
-            quality: 'lowest',
-            filter: 'audioonly',
+            quality: 'lowest' as const,
+            filter: 'audioonly' as const,
             highWaterMark: 1 << 24,
             requestOptions: {
               headers: {
@@ -98,8 +98,8 @@ export class DistubeExtractor extends BaseExtractor {
             }
           },
           {
-            quality: 'highestaudio',
-            filter: 'audioonly',
+            quality: 'highestaudio' as const,
+            filter: 'audioonly' as const,
             highWaterMark: 1 << 23,
           }
         ];
@@ -114,7 +114,7 @@ export class DistubeExtractor extends BaseExtractor {
           console.log(`[${this.name}] Trying download option ${optionIndex + 1}/${downloadOptions.length}`);
           
           try {
-            const stream = ytdl(url, options);
+            const stream = ytdl(url, options as ytdl.downloadOptions);
             let hasData = false;
             
             stream.on('data', (chunk) => {

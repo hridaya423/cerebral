@@ -1,4 +1,4 @@
-import Fuse from 'fuse.js';
+import Fuse, { IFuseOptions } from 'fuse.js';
 import { Document, Packer, Paragraph, TextRun, HeadingLevel, AlignmentType } from 'docx';
 import { saveAs } from 'file-saver';
 import { jsPDF } from 'jspdf';
@@ -13,13 +13,12 @@ import {
   SearchFilters,
   ExportOptions,
   ExportFormat,
-  ExportProgress,
   ExportResult
 } from '../types';
 import { generateUniqueId } from './audio-utils';
 
 export class SearchUtils {
-  private static fuseOptions: Fuse.IFuseOptions<TranscriptionSegment> = {
+  private static fuseOptions: IFuseOptions<TranscriptionSegment> = {
     keys: ['text'],
     threshold: 0.4, 
     includeScore: true,
@@ -182,7 +181,7 @@ export class ExportUtils {
         });
       }
       
-      if (analysis.actionItems.length > 0) {
+      if (analysis.actionItems && analysis.actionItems.length > 0) {
         addText('Action Items:', 12, true);
         analysis.actionItems.forEach((item, index) => {
           addText(`${index + 1}. ${item}`, 10);
@@ -288,7 +287,7 @@ export class ExportUtils {
         });
       }
 
-      if (analysis.actionItems.length > 0) {
+      if (analysis.actionItems && analysis.actionItems.length > 0) {
         paragraphs.push(
           new Paragraph({
             text: 'Action Items:',
@@ -380,7 +379,7 @@ export class ExportUtils {
         content += '\n';
       }
 
-      if (analysis.actionItems.length > 0) {
+      if (analysis.actionItems && analysis.actionItems.length > 0) {
         content += 'Action Items:\n';
         analysis.actionItems.forEach((item, index) => {
           content += `${index + 1}. ${item}\n`;

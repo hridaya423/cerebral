@@ -1,13 +1,11 @@
-import { useState, useCallback, useMemo, useEffect } from 'react';
+import { useState, useCallback, useMemo } from 'react';
 import { 
-  SearchResult, 
   SearchQuery, 
   SearchFilters, 
   SearchState, 
   Transcription 
 } from '../types';
 import { SearchUtils } from '../lib/search-export-utils';
-import { LocalStorage } from '../lib/storage';
 
 export function useSearch() {
   const [searchState, setSearchState] = useState<SearchState>({
@@ -19,14 +17,10 @@ export function useSearch() {
     highlightedText: '',
   });
 
-  const transcriptions = useMemo(() => {
-    return LocalStorage.getTranscriptions();
-  }, []);
-
   const performSearch = useCallback(
-    async (query: string, filters: SearchFilters = {}) => {
-      if (!query.trim()) {
-        setSearchState(prev => ({
+    async (query: string, transcription: Transcription | null, filters: SearchFilters = {}) => {
+      if (!query.trim() || !transcription) {
+        setSearchState((prev: SearchState) => ({
           ...prev,
           query: '',
           results: [],
@@ -36,18 +30,12 @@ export function useSearch() {
         return;
       }
 
-      setSearchState(prev => ({ ...prev, isSearching: true }));
+      setSearchState((prev: SearchState) => ({ ...prev, isSearching: true }));
 
       try {
-        const searchQuery: SearchQuery = {
-          query: query.trim(),
-          type: 'text', 
-          filters,
-        };
+        const results = SearchUtils.searchInTranscription(transcription, query, filters);
 
-        const results = SearchUtils.searchMultipleTranscriptions(transcriptions, searchQuery);
-
-        setSearchState(prev => ({
+        setSearchState((prev: SearchState) => ({
           ...prev,
           query,
           results,
@@ -58,7 +46,7 @@ export function useSearch() {
         }));
       } catch (error) {
         console.error('Search error:', error);
-        setSearchState(prev => ({
+        setSearchState((prev: SearchState) => ({
           ...prev,
           isSearching: false,
           results: [],
@@ -66,7 +54,7 @@ export function useSearch() {
         }));
       }
     },
-    [transcriptions]
+    []
   );
 
   const searchInTranscription = useCallback(
@@ -79,25 +67,17 @@ export function useSearch() {
   );
 
   const searchByTime = useCallback(
-    (startTime: number, endTime: number, transcriptionId?: string) => {
-      setSearchState(prev => ({ ...prev, isSearching: true }));
+    (startTime: number, endTime: number, transcription: Transcription | null) => {
+      if (!transcription) {
+        return [];
+      }
+
+      setSearchState((prev: SearchState) => ({ ...prev, isSearching: true }));
 
       try {
-        let results: SearchResult[] = [];
+        const results = SearchUtils.searchByTimeRange(transcription, startTime, endTime);
 
-        if (transcriptionId) {
-          const transcription = transcriptions.find(t => t.id === transcriptionId);
-          if (transcription) {
-            results = SearchUtils.searchByTimeRange(transcription, startTime, endTime);
-          }
-        } else {
-          transcriptions.forEach(transcription => {
-            const timeResults = SearchUtils.searchByTimeRange(transcription, startTime, endTime);
-            results = [...results, ...timeResults];
-          });
-        }
-
-        setSearchState(prev => ({
+        setSearchState((prev: SearchState) => ({
           ...prev,
           results,
           currentResultIndex: results.length > 0 ? 0 : -1,
@@ -108,7 +88,7 @@ export function useSearch() {
         return results;
       } catch (error) {
         console.error('Time search error:', error);
-        setSearchState(prev => ({
+        setSearchState((prev: SearchState) => ({
           ...prev,
           isSearching: false,
           results: [],
@@ -117,11 +97,11 @@ export function useSearch() {
         return [];
       }
     },
-    [transcriptions]
+    []
   );
 
   const navigateResults = useCallback((direction: 'next' | 'prev') => {
-    setSearchState(prev => {
+    setSearchState((prev: SearchState) => {
       if (prev.results.length === 0) return prev;
 
       let newIndex = prev.currentResultIndex;
@@ -142,7 +122,7 @@ export function useSearch() {
   }, []);
 
   const jumpToResult = useCallback((index: number) => {
-    setSearchState(prev => ({
+    setSearchState((prev: SearchState) => ({
       ...prev,
       currentResultIndex: Math.max(0, Math.min(index, prev.results.length - 1)),
     }));
@@ -159,22 +139,26 @@ export function useSearch() {
     });
   }, []);
 
-  const updateFilters = useCallback((newFilters: SearchFilters) => {
-    setSearchState(prev => ({ ...prev, filters: newFilters }));
+  const updateFilters = useCallback((newFilters: SearchFilters, transcription: Transcription | null) => {
+    setSearchState((prev: SearchState) => ({ ...prev, filters: newFilters }));
     
-    if (searchState.query) {
-      performSearch(searchState.query, newFilters);
+    if (searchState.query && transcription) {
+      performSearch(searchState.query, transcription, newFilters);
     }
   }, [searchState.query, performSearch]);
 
   const advancedSearch = useCallback(
-    (searchQuery: SearchQuery) => {
-      setSearchState(prev => ({ ...prev, isSearching: true }));
+    (searchQuery: SearchQuery, transcription: Transcription | null) => {
+      if (!transcription) {
+        return [];
+      }
+
+      setSearchState((prev: SearchState) => ({ ...prev, isSearching: true }));
 
       try {
-        const results = SearchUtils.searchMultipleTranscriptions(transcriptions, searchQuery);
+        const results = SearchUtils.searchInTranscription(transcription, searchQuery.query, searchQuery.filters);
 
-        setSearchState(prev => ({
+        setSearchState((prev: SearchState) => ({
           ...prev,
           query: searchQuery.query,
           results,
@@ -187,7 +171,7 @@ export function useSearch() {
         return results;
       } catch (error) {
         console.error('Advanced search error:', error);
-        setSearchState(prev => ({
+        setSearchState((prev: SearchState) => ({
           ...prev,
           isSearching: false,
           results: [],
@@ -196,76 +180,33 @@ export function useSearch() {
         return [];
       }
     },
-    [transcriptions]
+    []
   );
-
-  const getHighlightedText = useCallback(
-    (text: string) => {
-      if (!searchState.highlightedText) return text;
-      return SearchUtils.highlightText(text, searchState.highlightedText);
-    },
-    [searchState.highlightedText]
-  );
-
-  const currentResult = useMemo(() => {
-    if (searchState.currentResultIndex >= 0 && searchState.results.length > 0) {
-      return searchState.results[searchState.currentResultIndex];
-    }
-    return null;
-  }, [searchState.currentResultIndex, searchState.results]);
 
   const searchStats = useMemo(() => {
+    const hasResults = searchState.results.length > 0;
+    const currentIndex = searchState.currentResultIndex;
+    
     return {
       totalResults: searchState.results.length,
-      currentIndex: searchState.currentResultIndex,
-      hasResults: searchState.results.length > 0,
-      isFirstResult: searchState.currentResultIndex === 0,
-      isLastResult: searchState.currentResultIndex === searchState.results.length - 1,
+      currentIndex: hasResults ? currentIndex : -1,
+      hasResults,
+      isFirstResult: currentIndex <= 0,
+      isLastResult: currentIndex >= searchState.results.length - 1,
     };
   }, [searchState.results.length, searchState.currentResultIndex]);
 
-  const handleKeyDown = useCallback((event: KeyboardEvent) => {
-    if (!searchState.query || searchState.results.length === 0) return;
-
-    if (event.ctrlKey || event.metaKey) {
-      switch (event.key) {
-        case 'ArrowDown':
-        case 'j': 
-          event.preventDefault();
-          navigateResults('next');
-          break;
-        case 'ArrowUp':
-        case 'k': 
-          event.preventDefault();
-          navigateResults('prev');
-          break;
-        case 'Escape':
-          event.preventDefault();
-          clearSearch();
-          break;
-      }
-    }
-  }, [searchState.query, searchState.results.length, navigateResults, clearSearch]);
-
-  useEffect(() => {
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [handleKeyDown]);
-
   return {
     searchState,
-    currentResult,
     searchStats,
-    
     performSearch,
     searchInTranscription,
     searchByTime,
-    advancedSearch,
     navigateResults,
     jumpToResult,
     clearSearch,
     updateFilters,
-    getHighlightedText,
+    advancedSearch,
   };
 }
 

@@ -40,7 +40,7 @@ export interface AnalysisResult {
   };
   topics: string[];
   sentiment: 'positive' | 'negative' | 'neutral';
-  actionItems: string[];
+  actionItems?: string[];
   createdAt: Date;
 }
 
@@ -70,6 +70,8 @@ export interface DiagramData {
   createdAt: Date;
 }
 
+
+
 export interface ProcessingStatus {
   stage: 'uploading' | 'transcribing' | 'analyzing' | 'completed' | 'error';
   progress: number;
@@ -93,3 +95,78 @@ export interface YouTubeVideoInfo {
 }
 
 export type SupportedAudioFormat = 'mp3' | 'wav' | 'm4a' | 'ogg' | 'webm';
+
+export interface SearchFilters {
+  language?: string;
+  minConfidence?: number;
+  audioSourceType?: 'recording' | 'upload' | 'youtube';
+  timeRange?: {
+    start: number;
+    end: number;
+  };
+  dateRange?: {
+    start: Date;
+    end: Date;
+  };
+}
+
+export interface SearchResult {
+  id: string;
+  transcriptionId: string;
+  segmentIndex?: number;
+  matchedText: string;
+  contextText: string;
+  startTime?: number;
+  endTime?: number;
+  confidence: number;
+  score: number;
+}
+
+export interface SearchQuery {
+  query: string;
+  type: 'text' | 'time' | 'combined';
+  filters: SearchFilters;
+  timeRange?: {
+    start: number;
+    end: number;
+  };
+}
+
+export interface SearchState {
+  query: string;
+  results: SearchResult[];
+  currentResultIndex: number;
+  isSearching: boolean;
+  filters: SearchFilters;
+  highlightedText: string;
+}
+
+  
+export type ExportFormat = 'pdf' | 'docx' | 'txt' | 'json' | 'csv';
+
+export interface ExportOptions {
+  format: ExportFormat;
+  includeAnalysis: boolean;
+  includeSegments: boolean;
+  includeTimestamps: boolean;
+  includeConfidence: boolean;
+  customTitle?: string;
+}
+
+export interface ExportResult {
+  id: string;
+  fileName: string;
+  format: ExportFormat;
+  fileSize: number;
+  createdAt: Date;
+  options: ExportOptions;
+}
+
+export interface ExportProgress {
+  stage: 'preparing' | 'processing' | 'generating' | 'exporting' | 'completed' | 'error';
+  progress: number;
+  message?: string;
+  error?: string;
+  fileName?: string;
+  fileSize?: number;
+}

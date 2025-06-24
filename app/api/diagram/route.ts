@@ -3,7 +3,7 @@ import { generateMermaidDiagram } from '../../lib/groq';
 
 export async function POST(request: NextRequest) {
   try {
-    const { text, diagramType } = await request.json();
+    const { text, diagramType, regenerationType } = await request.json();
     
     if (!text) {
       return NextResponse.json(
@@ -27,7 +27,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const diagram = await generateMermaidDiagram(text, diagramType);
+    const diagram = await generateMermaidDiagram(text, diagramType, regenerationType);
 
     return NextResponse.json({
       success: true,

@@ -1,152 +1,121 @@
 import { AudioSource, Transcription, AnalysisResult, ChatSession, DiagramData } from '../types';
 
-const STORAGE_KEYS = {
-  AUDIO_SOURCES: 'cerebral_audio_sources',
-  TRANSCRIPTIONS: 'cerebral_transcriptions',
-  ANALYSIS_RESULTS: 'cerebral_analysis_results',
-  CHAT_SESSIONS: 'cerebral_chat_sessions',
-  DIAGRAMS: 'cerebral_diagrams',
-  AUDIO_FILES: 'cerebral_audio_files',
-  AUDIO_BLOBS: 'cerebral_audio_blobs',
+const SESSION_KEYS = {
+  CURRENT_AUDIO_SOURCE: 'current_audio_source',
+  CURRENT_TRANSCRIPTION: 'current_transcription', 
+  CURRENT_ANALYSIS: 'current_analysis',
+  CURRENT_CHAT_SESSION: 'current_chat_session',
+  CURRENT_DIAGRAMS: 'current_diagrams',
+  CURRENT_AUDIO_FILE: 'current_audio_file',
+  CURRENT_AUDIO_BLOB: 'current_audio_blob',
 } as const;
 
-export class LocalStorage {
-  private static getFromStorage<T>(key: string): T[] {
-    if (typeof window === 'undefined') return [];
+export class SessionStorage {
+  private static initialized = false;
+
+  static initialize(): void {
+    if (this.initialized || typeof window === 'undefined') return;
     
-    try {
-      const data = localStorage.getItem(key);
-      return data ? JSON.parse(data) : [];
-    } catch (error) {
-      console.error(`Error reading from localStorage (${key}):`, error);
-      return [];
-    }
+    this.clearAllData();
+    
+    window.addEventListener('beforeunload', () => {
+      this.clearAllData();
+    });
+
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'hidden') {
+        this.clearAllData();
+      }
+    });
+
+    this.initialized = true;
   }
-  
-  private static saveToStorage<T>(key: string, data: T[]): void {
+
+  private static setSessionData<T>(key: string, data: T): void {
     if (typeof window === 'undefined') return;
     
     try {
-      localStorage.setItem(key, JSON.stringify(data));
+      sessionStorage.setItem(key, JSON.stringify(data));
     } catch (error) {
-      console.error(`Error saving to localStorage (${key}):`, error);
+      console.error(`Error saving to sessionStorage (${key}):`, error);
     }
   }
-  
-  static getAudioSources(): AudioSource[] {
-    return this.getFromStorage<AudioSource>(STORAGE_KEYS.AUDIO_SOURCES);
-  } 
-  
-  static saveAudioSource(audioSource: AudioSource): void {
-    const sources = this.getAudioSources();
-    const existingIndex = sources.findIndex(s => s.id === audioSource.id);
+
+  private static getSessionData<T>(key: string): T | null {
+    if (typeof window === 'undefined') return null;
     
-    if (existingIndex >= 0) {
-      sources[existingIndex] = audioSource;
-    } else {
-      sources.push(audioSource);
+    try {
+      const data = sessionStorage.getItem(key);
+      return data ? JSON.parse(data) : null;
+    } catch (error) {
+      console.error(`Error reading from sessionStorage (${key}):`, error);
+      return null;
     }
-    
-    this.saveToStorage(STORAGE_KEYS.AUDIO_SOURCES, sources);
   }
-  
-  static deleteAudioSource(id: string): void {
-    const sources = this.getAudioSources().filter(s => s.id !== id);
-    this.saveToStorage(STORAGE_KEYS.AUDIO_SOURCES, sources);
+
+  private static removeSessionData(key: string): void {
+    if (typeof window === 'undefined') return;
+    sessionStorage.removeItem(key);
   }
-  
-  static getTranscriptions(): Transcription[] {
-    return this.getFromStorage<Transcription>(STORAGE_KEYS.TRANSCRIPTIONS);
+
+  static getCurrentAudioSource(): AudioSource | null {
+    return this.getSessionData<AudioSource>(SESSION_KEYS.CURRENT_AUDIO_SOURCE);
   }
-  
-  static getTranscriptionByAudioId(audioSourceId: string): Transcription | null {
-    const transcriptions = this.getTranscriptions();
-    return transcriptions.find(t => t.audioSourceId === audioSourceId) || null;
+
+  static saveCurrentAudioSource(audioSource: AudioSource): void {
+    this.setSessionData(SESSION_KEYS.CURRENT_AUDIO_SOURCE, audioSource);
   }
-  
-  static saveTranscription(transcription: Transcription): void {
-    const transcriptions = this.getTranscriptions();
-    const existingIndex = transcriptions.findIndex(t => t.id === transcription.id);
-    
-    if (existingIndex >= 0) {
-      transcriptions[existingIndex] = transcription;
-    } else {
-      transcriptions.push(transcription);
-    }
-    
-    this.saveToStorage(STORAGE_KEYS.TRANSCRIPTIONS, transcriptions);
+
+  static clearCurrentAudioSource(): void {
+    this.removeSessionData(SESSION_KEYS.CURRENT_AUDIO_SOURCE);
   }
-  
-  static deleteTranscription(id: string): void {
-    const transcriptions = this.getTranscriptions().filter(t => t.id !== id);
-    this.saveToStorage(STORAGE_KEYS.TRANSCRIPTIONS, transcriptions);
+
+  static getCurrentTranscription(): Transcription | null {
+    return this.getSessionData<Transcription>(SESSION_KEYS.CURRENT_TRANSCRIPTION);
   }
-  
-  static getAnalysisResults(): AnalysisResult[] {
-    return this.getFromStorage<AnalysisResult>(STORAGE_KEYS.ANALYSIS_RESULTS);
+
+  static saveCurrentTranscription(transcription: Transcription): void {
+    this.setSessionData(SESSION_KEYS.CURRENT_TRANSCRIPTION, transcription);
   }
-  
-  static getAnalysisByTranscriptionId(transcriptionId: string): AnalysisResult | null {
-    const results = this.getAnalysisResults();
-    return results.find(r => r.transcriptionId === transcriptionId) || null;
+
+  static clearCurrentTranscription(): void {
+    this.removeSessionData(SESSION_KEYS.CURRENT_TRANSCRIPTION);
   }
-  
-  static saveAnalysisResult(result: AnalysisResult): void {
-    const results = this.getAnalysisResults();
-    const existingIndex = results.findIndex(r => r.id === result.id);
-    
-    if (existingIndex >= 0) {
-      results[existingIndex] = result;
-    } else {
-      results.push(result);
-    }
-    
-    this.saveToStorage(STORAGE_KEYS.ANALYSIS_RESULTS, results);
+
+  static getCurrentAnalysis(): AnalysisResult | null {
+    return this.getSessionData<AnalysisResult>(SESSION_KEYS.CURRENT_ANALYSIS);
   }
-  
-  static deleteAnalysisResult(id: string): void {
-    const results = this.getAnalysisResults().filter(r => r.id !== id);
-    this.saveToStorage(STORAGE_KEYS.ANALYSIS_RESULTS, results);
+
+  static saveCurrentAnalysis(analysis: AnalysisResult): void {
+    this.setSessionData(SESSION_KEYS.CURRENT_ANALYSIS, analysis);
   }
-  
-  static getChatSessions(): ChatSession[] {
-    return this.getFromStorage<ChatSession>(STORAGE_KEYS.CHAT_SESSIONS);
+
+  static clearCurrentAnalysis(): void {
+    this.removeSessionData(SESSION_KEYS.CURRENT_ANALYSIS);
   }
-  
-  static getChatSessionByAudioId(audioSourceId: string): ChatSession | null {
-    const sessions = this.getChatSessions();
-    return sessions.find(s => s.audioSourceId === audioSourceId) || null;
+
+  static getCurrentChatSession(): ChatSession | null {
+    return this.getSessionData<ChatSession>(SESSION_KEYS.CURRENT_CHAT_SESSION);
   }
-  
-  static saveChatSession(session: ChatSession): void {
-    const sessions = this.getChatSessions();
-    const existingIndex = sessions.findIndex(s => s.id === session.id);
-    
-    if (existingIndex >= 0) {
-      sessions[existingIndex] = session;
-    } else {
-      sessions.push(session);
-    }
-    
-    this.saveToStorage(STORAGE_KEYS.CHAT_SESSIONS, sessions);
+
+  static saveCurrentChatSession(session: ChatSession): void {
+    this.setSessionData(SESSION_KEYS.CURRENT_CHAT_SESSION, session);
   }
-  
-  static deleteChatSession(id: string): void {
-    const sessions = this.getChatSessions().filter(s => s.id !== id);
-    this.saveToStorage(STORAGE_KEYS.CHAT_SESSIONS, sessions);
+
+  static clearCurrentChatSession(): void {
+    this.removeSessionData(SESSION_KEYS.CURRENT_CHAT_SESSION);
   }
-  
-  static getDiagrams(): DiagramData[] {
-    return this.getFromStorage<DiagramData>(STORAGE_KEYS.DIAGRAMS);
+
+  static getCurrentDiagrams(): DiagramData[] {
+    return this.getSessionData<DiagramData[]>(SESSION_KEYS.CURRENT_DIAGRAMS) || [];
   }
-  
-  static getDiagramsByTranscriptionId(transcriptionId: string): DiagramData[] {
-    const diagrams = this.getDiagrams();
-    return diagrams.filter(d => d.transcriptionId === transcriptionId);
+
+  static saveCurrentDiagrams(diagrams: DiagramData[]): void {
+    this.setSessionData(SESSION_KEYS.CURRENT_DIAGRAMS, diagrams);
   }
-  
-  static saveDiagram(diagram: DiagramData): void {
-    const diagrams = this.getDiagrams();
+
+  static addCurrentDiagram(diagram: DiagramData): void {
+    const diagrams = this.getCurrentDiagrams();
     const existingIndex = diagrams.findIndex(d => d.id === diagram.id);
     
     if (existingIndex >= 0) {
@@ -155,130 +124,144 @@ export class LocalStorage {
       diagrams.push(diagram);
     }
     
-    this.saveToStorage(STORAGE_KEYS.DIAGRAMS, diagrams);
+    this.saveCurrentDiagrams(diagrams);
   }
-  
-  static deleteDiagram(id: string): void {
-    const diagrams = this.getDiagrams().filter(d => d.id !== id);
-    this.saveToStorage(STORAGE_KEYS.DIAGRAMS, diagrams);
+
+  static clearCurrentDiagrams(): void {
+    this.removeSessionData(SESSION_KEYS.CURRENT_DIAGRAMS);
   }
-  
-  static async saveAudioFile(audioSourceId: string, file: File): Promise<void> {
+
+  static async saveCurrentAudioFile(file: File): Promise<void> {
     if (typeof window === 'undefined') return;
     
     try {
       const arrayBuffer = await file.arrayBuffer();
       const fileData = {
-        audioSourceId,
         buffer: Array.from(new Uint8Array(arrayBuffer)),
         mimeType: file.type,
         fileName: file.name,
-        size: file.size,
+        size: file.size
       };
       
-      localStorage.setItem(`${STORAGE_KEYS.AUDIO_FILES}_${audioSourceId}`, JSON.stringify(fileData));
+      this.setSessionData(SESSION_KEYS.CURRENT_AUDIO_FILE, fileData);
     } catch (error) {
       console.error('Error saving audio file:', error);
+      throw error;
     }
   }
-  
-  static getAudioFile(audioSourceId: string): { buffer: ArrayBuffer; mimeType: string; fileName: string; size: number } | null {
-    if (typeof window === 'undefined') return null;
+
+  static getCurrentAudioFile(): { buffer: ArrayBuffer; mimeType: string; fileName: string; size: number } | null {
+    const fileData = this.getSessionData<{
+      buffer: number[];
+      mimeType: string;
+      fileName: string;
+      size: number;
+    }>(SESSION_KEYS.CURRENT_AUDIO_FILE);
     
-    try {
-      const data = localStorage.getItem(`${STORAGE_KEYS.AUDIO_FILES}_${audioSourceId}`);
-      if (!data) return null;
-      
-      const fileData = JSON.parse(data);
-      return {
-        buffer: new Uint8Array(fileData.buffer).buffer,
-        mimeType: fileData.mimeType,
-        fileName: fileData.fileName,
-        size: fileData.size,
-      };
-    } catch (error) {
-      console.error('Error retrieving audio file:', error);
-      return null;
+    if (fileData && fileData.buffer) {
+      try {
+        const uint8Array = new Uint8Array(fileData.buffer);
+        return {
+          buffer: uint8Array.buffer,
+          mimeType: fileData.mimeType,
+          fileName: fileData.fileName,
+          size: fileData.size
+        };
+      } catch (error) {
+        console.error('Error reconstructing audio file:', error);
+        return null;
+      }
     }
+    
+    return null;
   }
-  
-  static async saveAudioBlob(audioSourceId: string, blob: Blob): Promise<void> {
+
+  static clearCurrentAudioFile(): void {
+    this.removeSessionData(SESSION_KEYS.CURRENT_AUDIO_FILE);
+  }
+
+  static async saveCurrentAudioBlob(blob: Blob): Promise<void> {
     if (typeof window === 'undefined') return;
     
     try {
       const arrayBuffer = await blob.arrayBuffer();
       const blobData = {
-        audioSourceId,
         buffer: Array.from(new Uint8Array(arrayBuffer)),
         mimeType: blob.type,
-        size: blob.size,
+        size: blob.size
       };
       
-      localStorage.setItem(`${STORAGE_KEYS.AUDIO_BLOBS}_${audioSourceId}`, JSON.stringify(blobData));
+      this.setSessionData(SESSION_KEYS.CURRENT_AUDIO_BLOB, blobData);
     } catch (error) {
       console.error('Error saving audio blob:', error);
+      throw error;
     }
   }
-  
-  static getAudioBlob(audioSourceId: string): { blob: Blob; mimeType: string; size: number } | null {
-    if (typeof window === 'undefined') return null;
+
+  static getCurrentAudioBlob(): { blob: Blob; mimeType: string; size: number } | null {
+    const blobData = this.getSessionData<{
+      buffer: number[];
+      mimeType: string;
+      size: number;
+    }>(SESSION_KEYS.CURRENT_AUDIO_BLOB);
     
-    try {
-      const data = localStorage.getItem(`${STORAGE_KEYS.AUDIO_BLOBS}_${audioSourceId}`);
-      if (!data) return null;
-      
-      const blobData = JSON.parse(data);
-      const blob = new Blob([new Uint8Array(blobData.buffer)], { type: blobData.mimeType });
-      return {
-        blob,
-        mimeType: blobData.mimeType,
-        size: blobData.size,
-      };
-    } catch (error) {
-      console.error('Error retrieving audio blob:', error);
-      return null;
+    if (blobData && blobData.buffer) {
+      try {
+        const uint8Array = new Uint8Array(blobData.buffer);
+        const blob = new Blob([uint8Array], { type: blobData.mimeType });
+        return {
+          blob,
+          mimeType: blobData.mimeType,
+          size: blobData.size
+        };
+      } catch (error) {
+        console.error('Error reconstructing audio blob:', error);
+        return null;
+      }
     }
-  }
-  
-  static deleteAudioFile(audioSourceId: string): void {
-    if (typeof window === 'undefined') return;
-    localStorage.removeItem(`${STORAGE_KEYS.AUDIO_FILES}_${audioSourceId}`);
-  }
-  
-  static deleteAudioBlob(audioSourceId: string): void {
-    if (typeof window === 'undefined') return;
-    localStorage.removeItem(`${STORAGE_KEYS.AUDIO_BLOBS}_${audioSourceId}`);
-  }
     
+    return null;
+  }
+
+  static clearCurrentAudioBlob(): void {
+    this.removeSessionData(SESSION_KEYS.CURRENT_AUDIO_BLOB);
+  }
+
   static clearAllData(): void {
     if (typeof window === 'undefined') return;
     
-    Object.values(STORAGE_KEYS).forEach(key => {
-      localStorage.removeItem(key);
+    Object.values(SESSION_KEYS).forEach(key => {
+      sessionStorage.removeItem(key);
     });
-  }
-  
-  static getStorageSize(): string {
-    if (typeof window === 'undefined') return '0 KB';
     
-    let totalSize = 0;
-    Object.values(STORAGE_KEYS).forEach(key => {
-      const data = localStorage.getItem(key);
-      if (data) {
-        totalSize += new Blob([data]).size;
+    try {
+      const keysToRemove: string[] = [];
+      for (let i = 0; i < localStorage.length; i++) {
+        const key = localStorage.key(i);
+        if (key && key.startsWith('cerebral_')) {
+          keysToRemove.push(key);
+        }
       }
-    });
+      
+      keysToRemove.forEach(key => {
+        localStorage.removeItem(key);
+      });
+    } catch (error) {
+      console.error('Error clearing localStorage:', error);
+    }
     
-    return this.formatBytes(totalSize);
+    console.log('All session data has been cleared');
   }
-  
-  private static formatBytes(bytes: number): string {
-    if (bytes === 0) return '0 KB';
-    
-    const k = 1024;
-    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
-    const i = Math.floor(Math.log(bytes) / Math.log(k));
-    
-    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+
+  static resetCurrentSession(): void {
+    this.clearCurrentAudioSource();
+    this.clearCurrentTranscription();
+    this.clearCurrentAnalysis();
+    this.clearCurrentChatSession();
+    this.clearCurrentDiagrams();
+    this.clearCurrentAudioFile();
+    this.clearCurrentAudioBlob();
   }
 }
+
+export const LocalStorage = SessionStorage;

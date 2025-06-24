@@ -45,7 +45,7 @@ export async function POST(request: NextRequest) {
 
 export async function PUT(request: NextRequest) {
   try {
-    const { text } = await request.json();
+    const { text, includeActionItems = false } = await request.json();
     
     if (!text) {
       return NextResponse.json(
@@ -54,13 +54,19 @@ export async function PUT(request: NextRequest) {
       );
     }
 
-    const [summary, keyNotes, topics, sentiment, actionItems] = await Promise.all([
+    const analysisTasks = [
       analyzeText(text, 'summary'),
       analyzeText(text, 'key_notes'),
       analyzeText(text, 'topics'),
       analyzeText(text, 'sentiment'),
-      analyzeText(text, 'action_items'),
-    ]);
+    ];
+
+    if (includeActionItems) {
+      analysisTasks.push(analyzeText(text, 'action_items'));
+    }
+
+    const results = await Promise.all(analysisTasks);
+    const [summary, keyNotes, topics, sentiment, actionItems] = results;
 
     let parsedSummary;
     try {
@@ -82,16 +88,31 @@ export async function PUT(request: NextRequest) {
       parsedTopics = [topics];
     }
 
+    const analysis: {
+      summary: {
+        brief: string;
+        detailed: string;
+        comprehensive: string;
+      };
+      keyNotes: string[];
+      topics: string[];
+      sentiment: 'positive' | 'negative' | 'neutral';
+      actionItems?: string[];
+    } = {
+      summary: parsedSummary,
+      keyNotes: keyNotes.split('\n').filter(note => note.trim()),
+      topics: Array.isArray(parsedTopics) ? parsedTopics : [parsedTopics],
+      sentiment: sentiment.toLowerCase().includes('positive') ? 'positive' :
+                 sentiment.toLowerCase().includes('negative') ? 'negative' : 'neutral',
+    };
+
+    if (includeActionItems && actionItems) {
+      analysis.actionItems = actionItems.split('\n').filter(item => item.trim());
+    }
+
     return NextResponse.json({
       success: true,
-      analysis: {
-        summary: parsedSummary,
-        keyNotes: keyNotes.split('\n').filter(note => note.trim()),
-        topics: Array.isArray(parsedTopics) ? parsedTopics : [parsedTopics],
-        sentiment: sentiment.toLowerCase().includes('positive') ? 'positive' :
-                   sentiment.toLowerCase().includes('negative') ? 'negative' : 'neutral',
-        actionItems: actionItems.split('\n').filter(item => item.trim()),
-      },
+      analysis,
     });
   } catch (error) {
     console.error('Batch analysis error:', error);

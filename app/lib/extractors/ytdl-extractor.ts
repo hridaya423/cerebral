@@ -14,7 +14,7 @@ export class YtdlExtractor extends BaseExtractor {
   isValidUrl(url: string): boolean {
     try {
       return ytdl.validateURL(url);
-    } catch (error) {
+    } catch {
       return false;
     }
   }

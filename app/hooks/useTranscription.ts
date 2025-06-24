@@ -88,14 +88,14 @@ export function useTranscription() {
     }
   }, []);
 
-  const analyzeText = useCallback(async (text: string) => {
+  const analyzeText = useCallback(async (text: string, includeActionItems: boolean = false) => {
     setStatus({ stage: 'analyzing', progress: 20 });
 
     try {
       const response = await fetch('/api/analyze', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ text }),
+        body: JSON.stringify({ text, includeActionItems }),
       });
 
       if (!response.ok) {
@@ -107,6 +107,35 @@ export function useTranscription() {
       setStatus({ stage: 'completed', progress: 100 });
 
       return result.analysis;
+    } catch (error) {
+      setStatus({ 
+        stage: 'error', 
+        progress: 0, 
+        error: error instanceof Error ? error.message : 'Unknown error' 
+      });
+      throw error;
+    }
+  }, []);
+
+  const generateActionItems = useCallback(async (text: string) => {
+    setStatus({ stage: 'analyzing', progress: 50 });
+
+    try {
+      const response = await fetch('/api/analyze', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text, analysisType: 'action_items' }),
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || 'Action items generation failed');
+      }
+
+      const result = await response.json();
+      setStatus({ stage: 'completed', progress: 100 });
+
+      return result.result.split('\n').filter((item: string) => item.trim());
     } catch (error) {
       setStatus({ 
         stage: 'error', 
@@ -155,6 +184,7 @@ export function useTranscription() {
     transcribeFile,
     transcribeYouTube,
     analyzeText,
+    generateActionItems,
     generateDiagram,
     reset,
   };

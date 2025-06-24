@@ -1,16 +1,20 @@
 'use client';
 
-import { useState } from 'react';
-import { Brain, FileText, MessageSquare, GitBranch, Mic, Upload} from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { Brain, FileText, MessageSquare, GitBranch, Mic, Upload, Search, Download, Lightbulb, Copy, CheckSquare, Calendar, Plus, Flag, Clock } from 'lucide-react';
 import AudioManager from './components/audio-input/AudioManager';
 import ProcessingStatus from './components/ui/ProcessingStatus';
 import TranscriptionViewer from './components/TranscriptionViewer';
 import ChatInterface from './components/ChatInterface';
 import DiagramViewer from './components/DiagramViewer';
+import SearchBar from './components/SearchBar';
+import SearchResults from './components/SearchResults';
+import ExportManager from './components/ExportManager';
 import { CardSkeleton, TranscriptionSkeleton } from './components/ui/LoadingSkeleton';
 import { AudioSource, Transcription, AnalysisResult } from './types';
 import { useTranscription } from './hooks/useTranscription';
-import { LocalStorage } from './lib/storage';
+import { useSearch } from './hooks/useSearch';
+import { SessionStorage } from './lib/storage';
 import { generateUniqueId } from './lib/audio-utils';
 import Image from 'next/image';
 
@@ -19,9 +23,24 @@ export default function Home() {
   const [currentAudioSource, setCurrentAudioSource] = useState<AudioSource | null>(null);
   const [currentTranscription, setCurrentTranscription] = useState<Transcription | null>(null);
   const [currentAnalysis, setCurrentAnalysis] = useState<AnalysisResult | null>(null);
-  const [activeTab, setActiveTab] = useState<'input' | 'transcription' | 'analysis' | 'chat' | 'diagrams'>('input');
+  const [activeTab, setActiveTab] = useState<'input' | 'transcription' | 'analysis' | 'chat' | 'diagrams' | 'search'>('input');
+  const [showExportManager, setShowExportManager] = useState(false);
   
-  const { status, transcribeFile, transcribeYouTube, analyzeText, reset } = useTranscription();
+  const { status, transcribeFile, transcribeYouTube, analyzeText, generateActionItems, reset } = useTranscription();
+  const {
+    searchState,
+    searchStats,
+    performSearch,
+    searchByTime,
+    navigateResults,
+    clearSearch,
+  } = useSearch();
+
+  const [isGeneratingActionItems, setIsGeneratingActionItems] = useState(false);
+
+  useEffect(() => {
+    SessionStorage.initialize();
+  }, []);
 
   const handleGetStarted = () => {
     setShowWelcome(false);
@@ -29,7 +48,7 @@ export default function Home() {
 
   const handleAudioSourceReady = async (audioSource: AudioSource) => {
     setCurrentAudioSource(audioSource);
-    LocalStorage.saveAudioSource(audioSource);
+    SessionStorage.saveCurrentAudioSource(audioSource);
     
     setActiveTab('transcription');
     
@@ -39,7 +58,7 @@ export default function Home() {
       if (audioSource.type === 'youtube') {
         transcriptionResult = await transcribeYouTube(audioSource.url!, 'en');
       } else if (audioSource.type === 'upload' && audioSource.fileName) {
-        const fileData = LocalStorage.getAudioFile(audioSource.id);
+        const fileData = SessionStorage.getCurrentAudioFile();
         if (fileData) {
           const blob = new Blob([fileData.buffer], { type: fileData.mimeType });
           const file = new File([blob], audioSource.fileName, { type: fileData.mimeType });
@@ -49,7 +68,7 @@ export default function Home() {
           throw new Error('Audio file data not found');
         }
       } else if (audioSource.type === 'recording') {
-        const audioData = LocalStorage.getAudioBlob(audioSource.id);
+        const audioData = SessionStorage.getCurrentAudioBlob();
         if (audioData) {
           const file = new File([audioData.blob], `recording-${audioSource.id}.webm`, { type: audioData.blob.type });
           const transcription = await transcribeFile(file, 'en');
@@ -72,9 +91,9 @@ export default function Home() {
       };
       
       setCurrentTranscription(transcription);
-      LocalStorage.saveTranscription(transcription);
+      SessionStorage.saveCurrentTranscription(transcription);
       
-      const analysis = await analyzeText(transcription.text);
+      const analysis = await analyzeText(transcription.text, false);
       const analysisResult: AnalysisResult = {
         id: generateUniqueId(),
         transcriptionId: transcription.id,
@@ -82,16 +101,35 @@ export default function Home() {
         summary: analysis.summary,
         topics: analysis.topics,
         sentiment: analysis.sentiment,
-        actionItems: analysis.actionItems,
         createdAt: new Date(),
       };
       
       setCurrentAnalysis(analysisResult);
-      LocalStorage.saveAnalysisResult(analysisResult);
+      SessionStorage.saveCurrentAnalysis(analysisResult);
       
       setActiveTab('analysis');
     } catch (error) {
       console.error('Error processing audio:', error);
+    }
+  };
+
+  const handleGenerateActionItems = async () => {
+    if (!currentTranscription || !currentAnalysis) return;
+    
+    setIsGeneratingActionItems(true);
+    try {
+      const actionItems = await generateActionItems(currentTranscription.text);
+      const updatedAnalysis: AnalysisResult = {
+        ...currentAnalysis,
+        actionItems: actionItems,
+      };
+      
+      setCurrentAnalysis(updatedAnalysis);
+      SessionStorage.saveCurrentAnalysis(updatedAnalysis);
+    } catch (error) {
+      console.error('Error generating action items:', error);
+    } finally {
+      setIsGeneratingActionItems(false);
     }
   };
 
@@ -100,6 +138,7 @@ export default function Home() {
     setCurrentTranscription(null);
     setCurrentAnalysis(null);
     setActiveTab('input');
+    SessionStorage.resetCurrentSession();
     reset();
   };
 
@@ -268,13 +307,22 @@ export default function Home() {
             </div>
             
             {currentAudioSource && (
-              <button
-                onClick={resetApplication}
-                className="px-3 sm:px-6 py-2 sm:py-2.5 text-xs sm:text-sm text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-lg transition-all duration-200 font-semibold border border-slate-200 min-h-[44px] touch-manipulation"
-              >
-                <span className="hidden sm:inline">New Session</span>
-                <span className="sm:hidden">New</span>
-              </button>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => setShowExportManager(true)}
+                  className="px-3 sm:px-4 py-2 sm:py-2.5 text-xs sm:text-sm text-purple-700 bg-purple-50 hover:bg-purple-100 rounded-lg transition-all duration-200 font-semibold border border-purple-200 min-h-[44px] touch-manipulation flex items-center gap-2"
+                >
+                  <Download className="w-4 h-4" />
+                  <span className="hidden sm:inline">Export</span>
+                </button>
+                <button
+                  onClick={resetApplication}
+                  className="px-3 sm:px-6 py-2 sm:py-2.5 text-xs sm:text-sm text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-lg transition-all duration-200 font-semibold border border-slate-200 min-h-[44px] touch-manipulation"
+                >
+                  <span className="hidden sm:inline">New Session</span>
+                  <span className="sm:hidden">New</span>
+                </button>
+              </div>
             )}
           </div>
         </div>
@@ -290,6 +338,7 @@ export default function Home() {
                 { id: 'analysis', name: 'Analysis', icon: Brain },
                 { id: 'chat', name: 'Chat', icon: MessageSquare },
                 { id: 'diagrams', name: 'Diagrams', icon: GitBranch },
+                { id: 'search', name: 'Search', icon: Search },
               ].map((tab) => {
                 const Icon = tab.icon;
                 const isActive = activeTab === tab.id;
@@ -398,17 +447,40 @@ export default function Home() {
 
                 {currentAnalysis.keyNotes.length > 0 && (
                   <div className="mb-8">
-                    <h3 className="text-lg font-bold mb-4 text-slate-900">Key Notes</h3>
-                    <ul className="space-y-4">
+                    <div className="flex items-center gap-3 mb-6">
+                      <div className="w-10 h-10 bg-orange-100 rounded-xl flex items-center justify-center">
+                        <Lightbulb className="w-5 h-5 text-orange-600" />
+                      </div>
+                      <h3 className="text-xl font-bold text-slate-900">Key Notes</h3>
+                      <span className="bg-orange-100 text-orange-700 px-3 py-1 rounded-full text-sm font-semibold">
+                        {currentAnalysis.keyNotes.length} insights
+                      </span>
+                    </div>
+                    <div className="grid gap-4">
                       {currentAnalysis.keyNotes.map((note, index) => (
-                        <li key={index} className="flex items-start bg-orange-50 p-6 rounded-xl border border-orange-200">
-                          <span className="w-8 h-8 bg-orange-600 text-white rounded-xl flex items-center justify-center text-sm font-bold mr-4 flex-shrink-0">
-                            {index + 1}
-                          </span>
-                          <span className="text-base text-slate-800 leading-relaxed">{note}</span>
-                        </li>
+                        <div key={index} className="group bg-gradient-to-r from-orange-50 to-orange-25 hover:from-orange-100 hover:to-orange-50 p-6 rounded-xl border border-orange-200 hover:border-orange-300 transition-all duration-200 hover:shadow-md">
+                          <div className="flex items-start gap-4">
+                            <div className="w-8 h-8 bg-gradient-to-br from-orange-500 to-orange-600 text-white rounded-xl flex items-center justify-center text-sm font-bold flex-shrink-0 shadow-sm group-hover:shadow-md transition-shadow">
+                              {index + 1}
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <p className="text-base text-slate-800 leading-relaxed font-medium group-hover:text-slate-900 transition-colors">
+                                {note}
+                              </p>
+                            </div>
+                            <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                              <button 
+                                onClick={() => navigator.clipboard.writeText(note)}
+                                className="p-1.5 text-slate-400 hover:text-orange-600 hover:bg-orange-100 rounded-lg transition-colors"
+                                title="Copy note"
+                              >
+                                <Copy className="w-4 h-4" />
+                              </button>
+                            </div>
+                          </div>
+                        </div>
                       ))}
-                    </ul>
+                    </div>
                   </div>
                 )}
 
@@ -438,19 +510,114 @@ export default function Home() {
                   </div>
                 </div>
                         
-                {currentAnalysis.actionItems.length > 0 && (
-                  <div className="bg-slate-50 p-6 rounded-xl border border-slate-200">
-                    <h3 className="text-lg font-bold mb-4 text-slate-900">Action Items</h3>
-                    <ul className="space-y-4">
+                {currentAnalysis.actionItems && currentAnalysis.actionItems.length > 0 ? (
+                  <div className="bg-gradient-to-br from-blue-50 to-indigo-50 p-6 rounded-xl border border-blue-200 shadow-sm">
+                    <div className="flex items-center justify-between mb-6">
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 bg-blue-100 rounded-xl flex items-center justify-center">
+                          <CheckSquare className="w-5 h-5 text-blue-600" />
+                        </div>
+                        <h3 className="text-xl font-bold text-slate-900">Action Items</h3>
+                        <span className="bg-blue-100 text-blue-700 px-3 py-1 rounded-full text-sm font-semibold">
+                          {currentAnalysis.actionItems.length} tasks
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <button className="flex items-center gap-2 px-3 py-2 text-sm font-medium text-blue-600 hover:text-blue-700 hover:bg-blue-100 rounded-lg transition-colors">
+                          <Download className="w-4 h-4" />
+                          Export as TODO
+                        </button>
+                        <button className="flex items-center gap-2 px-3 py-2 text-sm font-medium text-blue-600 hover:text-blue-700 hover:bg-blue-100 rounded-lg transition-colors">
+                          <Calendar className="w-4 h-4" />
+                          Add to Calendar
+                        </button>
+                      </div>
+                    </div>
+                    <div className="space-y-3">
                       {currentAnalysis.actionItems.map((item, index) => (
-                        <li key={index} className="flex items-start">
-                          <span className="bg-blue-600 text-white text-sm rounded-lg w-8 h-8 flex items-center justify-center mr-4 mt-0.5 flex-shrink-0 font-bold">
-                            {index + 1}
-                          </span>
-                          <span className="text-base text-slate-800 leading-relaxed">{item}</span>
-                        </li>
+                        <div key={index} className="group bg-white hover:bg-blue-25 p-5 rounded-xl border border-blue-100 hover:border-blue-200 transition-all duration-200 hover:shadow-sm">
+                          <div className="flex items-start gap-4">
+                            <div className="flex items-center gap-3">
+                              <input 
+                                type="checkbox" 
+                                className="w-5 h-5 text-blue-600 bg-white border-2 border-slate-300 rounded focus:ring-blue-500 focus:ring-2 hover:border-blue-400 transition-colors cursor-pointer"
+                                onChange={(e) => {    
+                                  e.target.parentElement?.parentElement?.classList.toggle('opacity-60', e.target.checked);
+                                  e.target.parentElement?.parentElement?.querySelector('.action-text')?.classList.toggle('line-through', e.target.checked);
+                                }}
+                              />
+                              <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-blue-600 text-white rounded-xl flex items-center justify-center text-sm font-bold flex-shrink-0 shadow-sm group-hover:shadow-md transition-shadow">
+                                {index + 1}
+                              </div>
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <p className="action-text text-base text-slate-800 leading-relaxed font-medium group-hover:text-slate-900 transition-colors">
+                                {item}
+                              </p>
+                            </div>
+                            <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                              <button 
+                                onClick={() => navigator.clipboard.writeText(item)}
+                                className="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-100 rounded-lg transition-colors"
+                                title="Copy action item"
+                              >
+                                <Copy className="w-4 h-4" />
+                              </button>
+                              <button 
+                                className="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-100 rounded-lg transition-colors"
+                                title="Set priority"
+                              >
+                                <Flag className="w-4 h-4" />
+                              </button>
+                              <button 
+                                className="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-100 rounded-lg transition-colors"
+                                title="Add deadline"
+                              >
+                                <Clock className="w-4 h-4" />
+                              </button>
+                            </div>
+                          </div>
+                        </div>
                       ))}
-                    </ul>
+                    </div>
+                    <div className="mt-6 pt-4 border-t border-blue-200">
+                      <div className="flex items-center justify-between text-sm">
+                        <span className="text-slate-600 font-medium">
+                          Track your progress and stay organized
+                        </span>
+                        <button className="flex items-center gap-2 text-blue-600 hover:text-blue-700 font-medium">
+                          <Plus className="w-4 h-4" />
+                          Add custom action
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="bg-slate-50 p-6 rounded-xl border border-slate-200">
+                    <div className="text-center">
+                      <div className="w-16 h-16 bg-blue-100 rounded-2xl flex items-center justify-center mx-auto mb-4">
+                        <CheckSquare className="w-8 h-8 text-blue-500" />
+                      </div>
+                      <h3 className="text-lg font-bold text-slate-900 mb-2">No Action Items Generated</h3>
+                      <p className="text-slate-600 mb-6">Extract actionable tasks and to-dos from your transcribed content using AI analysis.</p>
+                      <button 
+                        onClick={handleGenerateActionItems}
+                        disabled={isGeneratingActionItems}
+                        className="bg-blue-500 hover:bg-blue-600 disabled:bg-blue-300 text-white px-6 py-3 rounded-lg font-semibold transition-colors flex items-center gap-2 mx-auto"
+                      >
+                        {isGeneratingActionItems ? (
+                          <>
+                            <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                            Generating...
+                          </>
+                        ) : (
+                          <>
+                            <CheckSquare className="w-4 h-4" />
+                            Generate Action Items
+                          </>
+                        )}
+                      </button>
+                    </div>
                   </div>
                 )}
               </div>
@@ -505,7 +672,87 @@ export default function Home() {
           </>
         )}
 
+        {activeTab === 'search' && (
+          <div className="space-y-6">
+            <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-6">
+              <div className="flex items-center gap-3 mb-6">
+                <div className="w-10 h-10 bg-purple-100 rounded-xl flex items-center justify-center">
+                  <Search className="w-5 h-5 text-purple-500" />
+                </div>
+                <h2 className="text-2xl font-bold text-slate-900 tracking-tight">Search All Content</h2>
+              </div>
+
+              <SearchBar
+                onSearch={(query: string, filters?: import('./types').SearchFilters) => performSearch(query, currentTranscription, filters)}
+                onTimeSearch={(startTime: number, endTime: number) => searchByTime(startTime, endTime, currentTranscription)}
+                onClear={clearSearch}
+                isSearching={searchState.isSearching}
+                searchStats={searchStats}
+                onNavigate={navigateResults}
+                placeholder="Search in current transcription..."
+              />
+            </div>
+
+            {searchState.results.length > 0 && (
+              <SearchResults
+                results={searchState.results}
+                currentResultIndex={searchState.currentResultIndex}
+                searchQuery={searchState.query}
+                currentTranscription={currentTranscription}
+                currentAudioSource={currentAudioSource}
+                onResultClick={() => {
+                  setActiveTab('transcription');
+                }}
+                onJumpToTime={() => { 
+                  setActiveTab('transcription');
+                }}
+              />
+            )}
+
+            {searchState.query && (
+              <div className="bg-slate-50 rounded-lg p-4">
+                <div className="flex items-center justify-between text-sm">
+                  <span className="text-slate-600">
+                    {searchState.results.length === 0 
+                      ? 'No results found' 
+                      : `Found ${searchState.results.length} result${searchState.results.length !== 1 ? 's' : ''}`
+                    }
+                  </span>
+                  {searchState.results.length > 0 && (
+                    <span className="text-slate-500">
+                      Use Ctrl+↑/↓ to navigate results
+                    </span>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {!currentTranscription && (
+              <div className="bg-white p-16 rounded-xl border border-slate-200 text-center shadow-sm">
+                <div className="w-16 h-16 bg-slate-100 rounded-2xl flex items-center justify-center mx-auto mb-6">
+                  <Search className="w-8 h-8 text-slate-400" />
+                </div>
+                <h2 className="text-xl font-bold text-slate-900 mb-3">No Content to Search</h2>
+                <p className="text-slate-600 font-medium">Process an audio source to start searching through transcriptions.</p>
+              </div>
+            )}
+          </div>
+        )}
+
       </main>
+
+      {showExportManager && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+            <ExportManager
+              transcription={currentTranscription || undefined}
+              audioSource={currentAudioSource || undefined}
+              analysis={currentAnalysis || undefined}
+              onClose={() => setShowExportManager(false)}
+            />
+          </div>
+        </div>
+      )}
     </div>
   );
 }

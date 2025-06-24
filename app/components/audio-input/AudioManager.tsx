@@ -7,7 +7,7 @@ import FileUploader from './FileUploader';
 import YouTubeProcessor from './YouTubeProcessor';
 import { AudioSource, YouTubeVideoInfo } from '../../types';
 import { generateUniqueId } from '../../lib/audio-utils';
-import { LocalStorage } from '../../lib/storage';
+import { SessionStorage } from '../../lib/storage';
 
 interface AudioManagerProps {
   onAudioSourceReady: (audioSource: AudioSource) => void;
@@ -29,7 +29,7 @@ export default function AudioManager({ onAudioSourceReady, disabled = false }: A
       mimeType: audioBlob.type,
     };
 
-    await LocalStorage.saveAudioBlob(audioSource.id, audioBlob);
+    await SessionStorage.saveCurrentAudioBlob(audioBlob);
 
     onAudioSourceReady(audioSource);
   };
@@ -47,7 +47,7 @@ export default function AudioManager({ onAudioSourceReady, disabled = false }: A
       mimeType: file.type,
     };
 
-    await LocalStorage.saveAudioFile(audioSource.id, file);
+    await SessionStorage.saveCurrentAudioFile(file);
 
     onAudioSourceReady(audioSource);
   };
