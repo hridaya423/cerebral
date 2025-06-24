@@ -1,36 +1,56 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+![Cerebral Logo](public/logo.png)
+# Cerebral
 
-## Getting Started
+Cerebral is an intelligent audio processing application that converts conversations, meetings, lectures, and podcasts into actionable insights through advanced AI-powered transcription, analysis, and interactive chat capabilities.
 
-First, run the development server:
+## ✨ Features
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
-```
+### Multiple Input Sources
+- **Live Recording**: Record audio directly in the browser with pause/resume functionality
+- **File Upload**: Drag and drop audio files (MP3, WAV, M4A, OGG, WebM)
+- **YouTube Processing**: Extract and process audio from YouTube videos
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+### Intelligent Analysis
+- **Accurate Transcription**: High-quality speech-to-text conversion with confidence scoring
+- **Automatic Summarization**: AI-generated summaries of key points
+- **Topic Extraction**: Intelligent identification and categorization of discussion topics
+- **Sentiment Analysis**: Emotional tone detection throughout conversations
+- **Action Items Generation**: Automatic extraction of tasks and follow-ups
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+- **Multiple Export Formats**: PDF, Word, TXT, JSON, CSV
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
 
-## Learn More
+## 🚀 Getting Started
 
-To learn more about Next.js, take a look at the following resources:
+### Prerequisites
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+- Node.js 18+ and npm
+- A Groq API key for AI processing
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+### Installation
 
-## Deploy on Vercel
+1. **Clone the repository**
+   ```bash
+   git clone https://github.com/hridaya423/cerebral.git
+   cd cerebral
+   ```
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+2. **Install dependencies**
+   ```bash
+   npm install
+   ```
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+3. **Set up environment variables**
+   Create a `.env.local` file in the root directory:
+   ```env
+   GROQ_API_KEY=your_groq_api_key_here
+   ```
+
+4. **Run the development server**
+   ```bash
+   npm run dev
+   ```
+
+5. **Open your browser**
+   Navigate to [http://localhost:3000](http://localhost:3000)
+
