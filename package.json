@@ -23,7 +23,7 @@
     "fuse.js": "^7.1.0",
     "groq-sdk": "^0.25.0",
     "jspdf": "^3.0.1",
-    "lucide-react": "^0.522.0",
+    "lucide-react": "^0.556.0",
     "mermaid": "^11.7.0",
     "next": "15.3.4",
     "node-fetch": "^3.3.2",
