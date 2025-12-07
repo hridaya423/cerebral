@@ -42,7 +42,7 @@
     "@types/react-dom": "^19",
     "@types/react-highlight-words": "^0.20.0",
     "eslint": "^9",
-    "eslint-config-next": "15.3.4",
+    "eslint-config-next": "16.0.7",
     "tailwindcss": "^4",
     "typescript": "^5"
   }
