@@ -28,7 +28,7 @@
     "next": "16.0.7",
     "node-fetch": "^3.3.2",
     "play-dl": "^1.9.7",
-    "react": "^19.2.1",
+    "react": "^19.2.3",
     "react-dom": "^19.2.1",
     "react-highlight-words": "^0.21.0",
     "ytdl-core": "^4.11.5"
