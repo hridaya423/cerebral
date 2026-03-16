@@ -21,7 +21,7 @@
     "file-saver": "^2.0.5",
     "framer-motion": "^12.36.0",
     "fuse.js": "^7.1.0",
-    "groq-sdk": "^0.37.0",
+    "groq-sdk": "^1.1.1",
     "jspdf": "^4.2.0",
     "lucide-react": "^0.577.0",
     "mermaid": "^11.13.0",
